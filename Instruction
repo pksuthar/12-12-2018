@@ -1,0 +1,65 @@
+/*
+Navigate to app > Handlers > Events and replace below file
+  - PenaltyNotiSent.php
+  
+  
+  
+Navigate to app > Http > Controllers and open ApiController.php file
+and replace sendDailyReminder function with below code: line no# 1117 at ApiController.php
+*/
+
+public function sendDailyReminder()
+    {
+        ini_set('max_execution_time', 300); //300 seconds = 5 minutes
+        $x=0; $i=0;
+        $finalArrayVal = array();
+        $today  = '%'.date('m-d');
+
+        $usersWithBD = User::select('id','name','mobile_no','email', 'device_id', 'badge_count')
+                       ->where('birthdate','like',$today)->where('is_member','1')
+                       ->get()->toArray();
+
+        $usersWithAnni = User::select('id','name','mobile_no','email', 'device_id', 'badge_count')
+                       ->where('annidate','like',$today)->where('is_member','1')
+                       ->get()->toArray();
+        
+        foreach ($usersWithBD as $user) {
+           $BdayUser[$x]['device_id'] = $user['device_id'];
+           $BdayUser[$x]['user_id']   = $user['id'];
+           $BdayUser[$x]['badge']     = 1;
+           $x++;
+        }
+        
+        foreach ($usersWithAnni as $user) {
+           $AniUser[$i]['device_id'] = $user['device_id'];
+           $AniUser[$i]['user_id']   = $user['id'];
+           $AniUser[$i]['badge']     = 1;
+           $i++;
+        }
+        
+        if(count($usersWithBD) > 0 || count($usersWithAnni) > 0)
+        {
+            $bdayText = trans('text.bday_wish');
+            $anniText = trans('text.anni_wish');
+
+            $bdayCount = count($usersWithBD);
+            $anniCount = count($usersWithAnni);
+            
+            event(new \App\Events\ReminderCalled($bdayCount,$anniCount));
+
+            if($anniCount > 0) {
+               send_custom_IOSNotification($AniUser, $finalArrayVal, $anniText); 
+            }
+            
+            if($bdayCount > 0) {
+                send_custom_IOSNotification($BdayUser, $finalArrayVal, $bdayText); 
+            }
+            $resp = $this->jsonforAPI('false','Done');
+            return response()->json($resp, 200);
+        }
+        else
+        {
+            $resp = $this->jsonforAPI('true','No birthdays or anniversary today');
+            return response()->json($resp, 400);
+        }
+    }
